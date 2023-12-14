@@ -1,5 +1,5 @@
 # GNBG-Generator
-**MATLAB Source Code for Generalized Numerical Benchmark Generator (GNBG)
+***MATLAB Source Code for Generalized Numerical Benchmark Generator (GNBG)***
 
 This repository contains the MATLAB source code for the Generalized Numerical Benchmark Generator (GNBG), an advanced tool for creating diverse and challenging numerical optimization problems.
 
