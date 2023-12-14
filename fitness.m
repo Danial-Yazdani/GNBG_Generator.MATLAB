@@ -1,6 +1,6 @@
 %***********************************GNBG***********************************
 %Author: Danial Yazdani
-%Last Edited: November 15, 2023
+%Last Edited: December 14, 2023
 %Title: Generalized Numerical Benchmark Generator
 % --------
 %Description: 
@@ -10,8 +10,8 @@
 %          and stored in 'GNBG' structure. 
 % --------
 %Refrence: 
-%           D. Yazdani, M. N. Omidvar, K. Deb, and A. H. Gandomi, "GNBG: A Generalized
-%           and Configurable Benchmark Generator for Continuous Numerical Optimization," 2023.
+%           D. Yazdani, M. N. Omidvar, D. Yazdani, K. Deb, and A. H. Gandomi, "GNBG: A Generalized
+%           and Configurable Benchmark Generator for Continuous Numerical Optimization," arXiv prepring	arXiv:2312.07083, 2023.
 % 
 %If you are using GNBG and this code in your work, you should cite the reference provided above.       
 % --------

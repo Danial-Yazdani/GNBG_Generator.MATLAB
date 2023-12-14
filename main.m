@@ -1,6 +1,6 @@
 %***********************************GNBG+DE***********************************
 %Author: Danial Yazdani
-%Last Edited: August 26, 2023
+%Last Edited: December 14, 2023
 %Title: Generalized Numerical Benchmark Generator
 % This MATLAB code implements the Differential Evolution (DE) optimization 
 % algorithm (DE/rand/1/bin) to solve problem instances generated
@@ -8,8 +8,8 @@
 % parameter setting for each problem instance is configured in 'BenchmarkGenerator.m'. 
 % --------
 %Refrence: 
-%           D. Yazdani, M. N. Omidvar, K. Deb, and A. H. Gandomi, "GNBG: A Generalized
-%           and Configurable Benchmark Generator for Continuous Numerical Optimization," 2023.
+%           D. Yazdani, M. N. Omidvar, D. Yazdani, K. Deb, and A. H. Gandomi, "GNBG: A Generalized
+%           and Configurable Benchmark Generator for Continuous Numerical Optimization," arXiv prepring	arXiv:2312.07083, 2023.
 % 
 %If you are using GNBG and this code in your work, you should cite the reference provided above.    
 % --------
