@@ -3,6 +3,8 @@
 
 This repository contains the MATLAB source code for the Generalized Numerical Benchmark Generator (GNBG), an advanced tool for creating diverse and challenging numerical optimization problems.
 
+Full description of GNBG can be found in "D. Yazdani, M. N. Omidvar, D. Yazdani, K. Deb, and A. H. Gandomi, "GNBG: A Generalized and Configurable Benchmark Generator for Continuous Numerical Optimization," arXiv prepring arXiv:2312.07083, 2023."
+
 Features:
 
 GNBG Problem Instance Generator: A versatile module to generate a wide array of optimization problems with user-defined characteristics and difficulty levels.
