@@ -1,30 +1,107 @@
-import os
 import numpy as np
-from scipy.io import loadmat
 import matplotlib.pyplot as plt
 
 
 class GNBG:
-    def __init__(self, MaxEvals, AcceptanceThreshold, Dimension, CompNum, MinCoordinate, MaxCoordinate, CompMinPos, CompSigma, CompH, Mu, Omega, Lambda, RotationMatrix, OptimumValue, OptimumPosition):
-        self.MaxEvals = MaxEvals
-        self.AcceptanceThreshold = AcceptanceThreshold
-        self.Dimension = Dimension
-        self.CompNum = CompNum
-        self.MinCoordinate = MinCoordinate
-        self.MaxCoordinate = MaxCoordinate
-        self.CompMinPos = CompMinPos
-        self.CompSigma = CompSigma
-        self.CompH = CompH
-        self.Mu = Mu
-        self.Omega = Omega
-        self.Lambda = Lambda
-        self.RotationMatrix = RotationMatrix
-        self.OptimumValue = OptimumValue
-        self.OptimumPosition = OptimumPosition
+    def __init__(self):
+        np.random.seed(1234)
+        self.MaxEvals = 100000
+        self.AcceptanceThreshold = 1e-08
+        self.Dimension = 5
+        self.CompNum = 3
+        self.MinCoordinate = -100
+        self.MaxCoordinate = 100
+        self.CompMinPos = self.initialize_component_position()
+        self.CompSigma = self.initialize_component_sigma()
+        self.CompH = self.initialize_component_H()
+
+        self.Mu = None
+        self.Omega = None
+        self.Lambda = None
+        self.RotationMatrix = None
+        self.OptimumValue = None
+        self.OptimumPosition = None
         self.FEhistory = []
         self.FE = 0
         self.AcceptanceReachPoint = np.inf
         self.BestFoundResult = np.inf
+
+    # Initializing the minimum/center position of components
+    def initialize_component_position(self): 
+        MinRandOptimaPos   = -80
+        MaxRandOptimaPos   = 80
+        MinExclusiveRange  = -30; # Must be LARGER than GNBG.MinRandOptimaPos
+        MaxExclusiveRange  = 30;  # Must be SMALLER than GNBG.MaxRandOptimaPos
+        ComponentPositioningMethod = 1 #(1) Random positions with uniform distribution inside the search range
+                                       #(2) Random positions with uniform distribution inside a specified range [GNBG.MinRandOptimaPos,GNBG.MaxRandOptimaPos]
+                                       #(3) Random positions inside a specified range [GNBG.MinRandOptimaPos,GNBG.MaxRandOptimaPos] but not within the sub-range [GNBG.MinExclusiveRange,GNBG.MaxExclusiveRange]
+                                       #(4) Random OVERLAPPING positions with uniform distribution inside a specified range [GNBG.MinRandOptimaPos,GNBG.MaxRandOptimaPos]. Remember to also set GNBG.SigmaPattern to 2. 
+        if ComponentPositioningMethod == 1:
+           CompMinPos = self.MinCoordinate + (self.MaxCoordinate - self.MinCoordinate) * np.random.rand(self.CompNum, self.Dimension)
+        elif ComponentPositioningMethod == 2:
+            CompMinPos = MinRandOptimaPos + (MaxRandOptimaPos - MinRandOptimaPos) * np.random.rand(self.CompNum, self.Dimension)
+        elif ComponentPositioningMethod == 3:
+            lower_range = MinRandOptimaPos + (MinExclusiveRange - MinRandOptimaPos) * np.random.rand(self.CompNum, self.Dimension)  # Generate random numbers in [MinRandOptimaPos, MinExclusiveRange)
+            upper_range = MaxExclusiveRange + (MaxRandOptimaPos - MaxExclusiveRange) * np.random.rand(self.CompNum, self.Dimension)  # Generate random numbers in (MaxExclusiveRange, MaxRandOptimaPos]
+            selector = np.random.randint(0, 2, size=(self.CompNum, self.Dimension))  # Randomly choose whether to take from lower_range or upper_range
+            CompMinPos = (selector * lower_range) + ((1 - selector) * upper_range)
+        elif ComponentPositioningMethod == 4:
+            CompMinPos = MinRandOptimaPos + np.tile(((MaxRandOptimaPos - MinRandOptimaPos) * np.random.rand(1, self.Dimension)), (self.CompNum, 1))  # Generating o overlapping minimum positions
+        else:
+            raise ValueError('Warning: Wrong number is chosen for GNBG.ComponentPositioningMethod.')
+        return CompMinPos
+    
+
+    # Initialize the minimum values of the components
+    def initialize_component_sigma(self):
+        MinSigma = -99
+        MaxSigma = -98
+        SigmaPattern = 1 # (1) A random sigma value for EACH component.
+                         # (2) A random sigma value for ALL components. It must be used for generating overlapping scenarios, or when the user plans to generate problem instances with multiple global optima.
+                         # (3) Manually defined values for sigma.
+        if SigmaPattern == 1:
+            ComponentSigma = MinSigma + (MaxSigma - MinSigma) * np.random.rand(self.CompNum, 1)
+        elif SigmaPattern == 2:
+            random_value = MinSigma + (MaxSigma - MinSigma) * np.random.rand()
+            ComponentSigma = np.full((self.CompNum, 1), random_value)
+        elif SigmaPattern == 3:
+            # USER-DEFINED ==> Adjust the size of this array to match the number of components (self.o)
+            ComponentSigma = np.array([[-1000], [-950]])
+        else:
+            raise ValueError('Wrong number is chosen for SigmaPattern.')
+        return ComponentSigma
+    
+    # Defining the elements of diagonal elements of H for components (Configuring condition number)
+    def initialize_component_H(self):
+        H_pattern = 3  # (1) Condition number is 1 and all elements of principal diagonal of H are set to a user defined value H_value
+                       # (2) Condition number is 1 for all components but the elements of principal diagonal of H are different from a component to another and are randomly generated with uniform distribution within the range [Lb_H, Ub_H].
+                       # (3) Condition number is random for all components the values of principal diagonal of the matrix H for each component are generated randomly within the range [Lb_H, Ub_H] using a uniform distribution.
+                       # (4) Condition number is Ub_H/Lb_H for all components where two randomly selected elements on the principal diagonal of the matrix H are explicitly set to Lb_H and Ub_H. The remaining diagonal elements are generated randomly within the range [Lb_H, Ub_H]. These values follow a Beta distribution characterized by user-defined parameters alpha and beta, where 0 < alpha = beta <= 1.
+                       # (5) Condition number is Ub_H/Lb_H for all components where a vector with Dimension equally spaced values between Lb_H and Ub_H is generated. The linspace function is used to create a linearly spaced vector that includes both the minimum and maximum values. For each component, a randomly permutation of this vector is used. 
+        Lb_H = 1  # Lower bound for H
+        Ub_H = 10**5  # Upper bound for H
+        alpha = 0.2  # Example, for Beta distribution
+        beta = alpha  # Assuming symmetric distribution        
+        if H_pattern == 1:
+            H_value = 1
+            CompH = H_value * np.ones((self.CompNum, self.Dimension))
+        elif H_pattern == 2:
+            CompH = (Lb_H + ((Ub_H - Lb_H) * np.random.rand(self.CompNum, 1))) * np.ones((self.CompNum, self.Dimension))
+        elif H_pattern == 3:
+            CompH = Lb_H + ((Ub_H - Lb_H) * np.random.rand(self.CompNum, self.Dimension))
+        elif H_pattern == 4:
+            CompH = Lb_H + ((Ub_H - Lb_H) * np.random.beta(alpha, beta, (self.CompNum, self.Dimension)))
+            for ii in range(self.CompNum):
+                random_indices = np.random.choice(self.Dimension, 2, replace=False)
+                CompH[ii, random_indices[0]] = Lb_H
+                CompH[ii, random_indices[1]] = Ub_H
+        elif H_pattern == 5:
+            H_Values = np.linspace(Lb_H, Ub_H, self.Dimension)
+            CompH = np.array([np.random.permutation(H_Values) for _ in range(self.CompNum)])
+        else:
+            raise ValueError('Wrong number is chosen for H_pattern.')
+        return CompH
+    
 
     def fitness(self, X):
         SolutionNumber = X.shape[0]
@@ -64,42 +141,11 @@ class GNBG:
         return Y
 
 
-# Get the current script's directory
-current_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Define the path to the folder where you want to read/write files
-folder_path = os.path.join(current_dir)
 
-# Initialization
-ProblemIndex = 1  # Choose a problem instance range from f1 to f24
 
-# Check if the chosen problem index is within the valid range
-if ProblemIndex < 1 or ProblemIndex > 24:
-    raise ValueError("Invalid problem index. Please choose a number from 1 to 24.")
+gnbg = GNBG()
 
-# Preparation and loading of the GNBG parameters based on the chosen problem instance
-if 1 <= ProblemIndex <= 24:
-    filename = f'f{ProblemIndex}.mat'
-    GNBG_tmp = loadmat(os.path.join(folder_path, filename))['GNBG']
-    MaxEvals = np.array([item[0] for item in GNBG_tmp['MaxEvals'].flatten()])[0, 0]
-    AcceptanceThreshold = np.array([item[0] for item in GNBG_tmp['AcceptanceThreshold'].flatten()])[0, 0]
-    Dimension = np.array([item[0] for item in GNBG_tmp['Dimension'].flatten()])[0, 0]
-    CompNum = np.array([item[0] for item in GNBG_tmp['o'].flatten()])[0, 0]  # Number of components
-    MinCoordinate = np.array([item[0] for item in GNBG_tmp['MinCoordinate'].flatten()])[0, 0]
-    MaxCoordinate = np.array([item[0] for item in GNBG_tmp['MaxCoordinate'].flatten()])[0, 0]
-    CompMinPos = np.array(GNBG_tmp['Component_MinimumPosition'][0, 0])
-    CompSigma = np.array(GNBG_tmp['ComponentSigma'][0, 0], dtype=np.float64)
-    CompH = np.array(GNBG_tmp['Component_H'][0, 0])
-    Mu = np.array(GNBG_tmp['Mu'][0, 0])
-    Omega = np.array(GNBG_tmp['Omega'][0, 0])
-    Lambda = np.array(GNBG_tmp['lambda'][0, 0])
-    RotationMatrix = np.array(GNBG_tmp['RotationMatrix'][0, 0])
-    OptimumValue = np.array([item[0] for item in GNBG_tmp['OptimumValue'].flatten()])[0, 0]
-    OptimumPosition = np.array(GNBG_tmp['OptimumPosition'][0, 0])
-else:
-    raise ValueError('ProblemIndex must be between 1 and 24.')
-
-gnbg = GNBG(MaxEvals, AcceptanceThreshold, Dimension, CompNum, MinCoordinate, MaxCoordinate, CompMinPos, CompSigma, CompH, Mu, Omega, Lambda, RotationMatrix, OptimumValue, OptimumPosition)
 
 # Set a random seed for the optimizer
 np.random.seed()  # This uses a system-based source to seed the random number generator
