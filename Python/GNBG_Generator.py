@@ -14,13 +14,11 @@ class GNBG:
         self.CompMinPos = self.initialize_component_position()
         self.CompSigma = self.initialize_component_sigma()
         self.CompH = self.initialize_component_H()
-
-        self.Mu = None
-        self.Omega = None
-        self.Lambda = None
-        self.RotationMatrix = None
-        self.OptimumValue = None
-        self.OptimumPosition = None
+        self.Mu, self.Omega = self.initialize_modality_parameters()
+        self.Lambda = self.initialize_lambda()
+        self.RotationMatrix = self.define_rotation_matrices()
+        self.OptimumValue = np.min(self.CompSigma)
+        self.OptimumPosition = self.CompMinPos[np.argmin(self.CompSigma), :]
         self.FEhistory = []
         self.FE = 0
         self.AcceptanceReachPoint = np.inf
@@ -102,6 +100,134 @@ class GNBG:
             raise ValueError('Wrong number is chosen for H_pattern.')
         return CompH
     
+    # Defining the parameters used in transformation function (Configuring modality of components and their basin local optima)
+    def initialize_modality_parameters(self):
+        MinMu = 0.2
+        MaxMu = 0.5
+        MinOmega = 5
+        MaxOmega = 50
+        localModalitySymmetry = 3  # (1) Unimodal, smooth, and regular components
+                                   # (2) Multimodal symmetric components
+                                   # (3) Multimodal asymmetric components
+                                   # (4) Manually defined values
+        if localModalitySymmetry == 1:
+            Mu = np.zeros((self.CompNum, 2))
+            Omega = np.zeros((self.CompNum, 4))
+        elif localModalitySymmetry == 2:
+            Mu = np.tile(MinMu + (MaxMu - MinMu) * np.random.rand(self.CompNum, 1), (1, 2))
+            Omega = np.tile(MinOmega + (MaxOmega - MinOmega) * np.random.rand(self.CompNum, 1), (1, 4))
+        elif localModalitySymmetry == 3:
+            Mu = MinMu + (MaxMu - MinMu) * np.random.rand(self.CompNum, 2)
+            Omega = MinOmega + (MaxOmega - MinOmega) * np.random.rand(self.CompNum, 4)
+        elif localModalitySymmetry == 4:
+            # Assuming self.CompNum is defined and matches the required shape
+            # User-defined values; adjust sizes as needed
+            Mu = np.array([[1, 1]] * self.CompNum)  # Adjust size as necessary
+            Omega = np.array([[10, 10, 10, 10]] * self.CompNum)  # Adjust size as necessary
+        else:
+            raise ValueError('Wrong number is chosen for localModalitySymmetry.')
+        return Mu, Omega
+    
+    # Defining the linearity of the basin of components
+    def initialize_lambda(self):
+        MaxLambda = 1
+        MinLambda = 1
+        LambdaValue4ALL = 0.25  # Default value; adjust as needed
+        LambdaConfigMethod = 1  # 1 All lambda are set to LambdaValue4ALL
+                                # 2 Randomly set lambda of each component in [MinLambda,MaxLambda]. Note that large ranges may result in existence of invisible components
+        if LambdaConfigMethod == 1:
+            Lambda = np.full((self.CompNum, 1), LambdaValue4ALL)
+        elif LambdaConfigMethod == 2:
+            Lambda = MinLambda + (MaxLambda - MinLambda) * np.random.rand(self.CompNum, 1)
+        else:
+            raise ValueError('Wrong number is chosen for LambdaConfigMethod.')
+        return Lambda
+    
+    def define_rotation_matrices(self):
+        MinAngle = -np.pi
+        MaxAngle = np.pi
+        Rotation = 2  # (1) Without rotation
+                      # (2) Random Rotation for all components==> Fully Connected Interaction with random angles for each plane of each component
+                      # (3) Random Rotation for all components==>For each component, interactions are defined randomly based on connection probability threshold GNBG.ConnectionProbability and random angles. GNBG.ConnectionProbability can be different for each component.
+                      # (4) Rotation based on a random Angle for each component (fully connected with an angle for all planes in each component)
+                      # (5) Rotation based on the specified Angle for all components (fully connected with an angle for all planes in all component)
+                      # (6) Rotation based on the random Angles to generate chain-like variable interaction structure
+                      # (7) Generating partially separable variable interaction structure with user defined sizes and angles for each group of variables
+        RotationMatrix = np.nan * np.zeros((self.CompNum, self.Dimension, self.Dimension))
+        if Rotation == 1:
+            RotationMatrix = np.array([np.eye(self.Dimension) for _ in range(self.CompNum)])
+        elif Rotation in [2, 3, 4, 5, 6, 7]:
+            if Rotation == 2:
+                for ii in range(self.CompNum):
+                    ThetaMatrix = np.zeros((self.Dimension, self.Dimension))
+                    upper_triangle_indices = np.triu_indices(self.Dimension, k=1)
+                    ThetaMatrix[upper_triangle_indices] = MinAngle + (MaxAngle - MinAngle) * np.random.rand(len(upper_triangle_indices[0]))
+                    RotationMatrix[ii, :, :] = self.rotation(ThetaMatrix)
+            elif Rotation == 3:
+                MinConProb = 0.5
+                MaxConProb = 0.75
+                ConnectionProbability = MinConProb + (MaxConProb - MinConProb) * np.random.rand(self.CompNum, 1)
+                for ii in range(self.CompNum):
+                    ThetaMatrix = np.zeros((self.Dimension, self.Dimension))
+                    for i in range(self.Dimension):
+                        for j in range(i + 1, self.Dimension):
+                            if np.random.rand() < ConnectionProbability[ii]:
+                                ThetaMatrix[i, j] = MinAngle + (MaxAngle - MinAngle) * np.random.rand()
+                    RotationMatrix[ii, :, :] = self.rotation(ThetaMatrix)
+            elif Rotation == 4:
+                randomAngle = MinAngle + (MaxAngle - MinAngle) * np.random.rand(self.CompNum, 1)
+                for ii in range(self.CompNum):
+                    ThetaMatrix = np.full((self.Dimension, self.Dimension), randomAngle[ii])
+                    lower_triangle_indices = np.tril_indices(ThetaMatrix.shape[0])
+                    ThetaMatrix[lower_triangle_indices] = 0 # Set all elements on and below the diagonal to 0
+                    RotationMatrix[ii, :, :] = self.rotation(ThetaMatrix)
+            elif Rotation == 5:
+                for ii in range(self.CompNum):
+                    SpecificAngles = 1.48353
+                    ThetaMatrix = np.full((self.Dimension, self.Dimension), SpecificAngles)
+                    lower_triangle_indices = np.tril_indices(ThetaMatrix.shape[0])
+                    ThetaMatrix[lower_triangle_indices] = 0 # Set all elements on and below the diagonal to 0
+                    RotationMatrix[ii, :, :] = self.rotation(ThetaMatrix)
+            elif Rotation == 6:
+                for ii in range(self.CompNum):
+                    ThetaMatrix = np.zeros((self.Dimension, self.Dimension))
+                    for i in range(self.Dimension - 1):
+                        ThetaMatrix[i, i + 1] = MinAngle + (MaxAngle - MinAngle) * np.random.rand()
+                    RotationMatrix[ii, :, :] = self.rotation(ThetaMatrix)
+            elif Rotation == 7:
+                S = np.array([3, 4, 3])  # Number of variables in each group
+                Theta = [np.pi/4, 3*np.pi/4, np.pi/8]  # Angle for each group
+                if sum(S) > self.Dimension or len(S) != len(Theta):
+                    raise ValueError("The sum of elements in S exceeds Dimension, or the sizes of S and Theta are not equal.")
+                for ii in range(self.CompNum):
+                    ThetaMatrix = np.zeros((self.Dimension, self.Dimension))
+                    allVars = np.random.permutation(self.Dimension)
+                    groupStart = 0
+                    for jj, size in enumerate(S):
+                        groupEnd = groupStart + size
+                        groupVars = allVars[groupStart:groupEnd]
+                        for var1 in groupVars:
+                            for var2 in groupVars:
+                                if var1 < var2:  # Only for elements above the diagonal
+                                    ThetaMatrix[var1, var2] = Theta[jj]
+                        groupStart = groupEnd
+                    RotationMatrix[ii, :, :] = self.rotation(ThetaMatrix)            
+        else:
+            raise ValueError('Wrong number is chosen for self.Rotation.')
+        return RotationMatrix
+
+    def rotation(self, teta):
+        R = np.eye(self.Dimension)
+        for p in range(self.Dimension - 1):
+            for q in range(p + 1, self.Dimension):
+                if teta[p, q] != 0:
+                    G = np.eye(self.Dimension)
+                    cos_val = np.cos(teta[p, q])
+                    sin_val = np.sin(teta[p, q])
+                    G[p, p], G[q, q] = cos_val, cos_val
+                    G[p, q], G[q, p] = -sin_val, sin_val
+                    R = np.dot(R, G)
+        return R
 
     def fitness(self, X):
         SolutionNumber = X.shape[0]
@@ -111,7 +237,7 @@ class GNBG:
             f = np.nan * np.ones(self.CompNum)
             for k in range(self.CompNum):
                 if len(self.RotationMatrix.shape) == 3:
-                    rotation_matrix = self.RotationMatrix[:, :, k]
+                    rotation_matrix = self.RotationMatrix[k, :, :]
                 else:
                     rotation_matrix = self.RotationMatrix
 
@@ -152,7 +278,7 @@ np.random.seed()  # This uses a system-based source to seed the random number ge
 
 
 #Your optimization algorithm goes here
-X = np.random.rand(10000, Dimension) # This is for generating a random population of 5 solutions for testing GNBG
+X = np.random.rand(10000, gnbg.Dimension) # This is for generating a random population of 5 solutions for testing GNBG
 # Calculating the fitness=objective values of the population using the GNBG function. The result is a 5x1 vector of objective values
 result = gnbg.fitness(X) 
 
@@ -163,7 +289,7 @@ result = gnbg.fitness(X)
 convergence = []
 best_error = float('inf')
 for value in gnbg.FEhistory:
-    error = abs(value - OptimumValue)
+    error = abs(value - gnbg.OptimumValue)
     if error < best_error:
         best_error = error
     convergence.append(best_error)
