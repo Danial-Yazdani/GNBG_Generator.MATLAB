@@ -46,7 +46,7 @@ class GNBG:
         elif ComponentPositioningMethod == 4:
             CompMinPos = MinRandOptimaPos + np.tile(((MaxRandOptimaPos - MinRandOptimaPos) * np.random.rand(1, self.Dimension)), (self.CompNum, 1))  # Generating o overlapping minimum positions
         else:
-            raise ValueError('Warning: Wrong number is chosen for GNBG.ComponentPositioningMethod.')
+            raise ValueError('Warning: Wrong number is chosen for ComponentPositioningMethod.')
         return CompMinPos
     
 
@@ -213,7 +213,7 @@ class GNBG:
                         groupStart = groupEnd
                     RotationMatrix[ii, :, :] = self.rotation(ThetaMatrix)            
         else:
-            raise ValueError('Wrong number is chosen for self.Rotation.')
+            raise ValueError('Wrong number is chosen for Rotation.')
         return RotationMatrix
 
     def rotation(self, teta):
