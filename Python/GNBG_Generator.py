@@ -1,7 +1,33 @@
+"""
+***********************************GNBG***********************************
+Author: Danial Yazdani
+Last Edited: March 09, 2024
+Title: Generalized Numerical Benchmark Generator (GNBG)
+--------
+Description: 
+          This function is the GNBG problem instance generator. By
+          manipulating the parameters in GNBG class, users can generate a
+          variety of problem instances.
+--------
+Reference: 
+           D. Yazdani, M. N. Omidvar, D. Yazdani, K. Deb, and A. H. Gandomi, "GNBG: A Generalized
+           and Configurable Benchmark Generator for Continuous Numerical Optimization," arXiv preprint	arXiv:2312.07083, 2023.
+ 
+If you are using GNBG and this code in your work, you should cite the reference provided above.       
+--------
+License:
+This program is to be used under the terms of the GNU General Public License
+(http://www.gnu.org/copyleft/gpl.html).
+Author: Danial Yazdani
+e-mail: danial DOT yazdani AT gmail DOT com
+Copyright notice: (c) 2023 Danial Yazdani
+************************************************************************** 
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 
-
+# Define the GNBG class including the generator function
 class GNBG:
     def __init__(self):
         np.random.seed(1234)
