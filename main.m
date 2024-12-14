@@ -21,7 +21,7 @@
 % Copyright notice: (c) 2023 Danial Yazdani
 %************************************************************************** 
 close all;clear all;clc; %#ok<CLALL> 
-RunNumber = 7;
+RunNumber = 3;
 Error = NaN(3,RunNumber);
 AcceptancePoints = NaN(1,RunNumber);
 for RunCounter=1 : RunNumber
@@ -102,17 +102,15 @@ disp(['Acceptance Ratio: ', num2str((sum(nonInfIndices) / length(AcceptancePoint
 disp(['FirstPointError: ', num2str(mean(Error(1,:))),'(',num2str(std(Error(1,:))),')']);
 disp(['SecondPointError: ', num2str(mean(Error(2,:))),'(',num2str(std(Error(2,:))),')']);
 disp(['LastPointError: ', num2str(mean(Error(3,:))),'(',num2str(std(Error(3,:))),')']);
+
 %% Convergence plot generation
 % MeanConvBhv = mean(ConvBhv);
-% openfig('allLambda');
-% hold on;
 % interval = GNBG.MaxEvals / 10; 
 % numbers = linspace(interval, GNBG.MaxEvals - interval, 10);
 % f=semilogy(MeanConvBhv,'k', 'LineWidth',1, 'Marker', 'd', 'MarkerIndices',round(numbers),'DisplayName','Main optima # = ');
 % xlabel('Fitness Evaluation Number')
 % ylabel('Error')
 % ylim([0,MeanConvBhv(1)])
-% title({[strcat('DE', ',\lambda= ', num2str(GNBG.lambda))]});
 % grid on
 % hold on 
 % line([0, GNBG.MaxEvals], [GNBG.AcceptanceThreshold, GNBG.AcceptanceThreshold], 'Color', 'red', 'LineStyle', '--', 'HandleVisibility', 'off', 'LineWidth',1)
